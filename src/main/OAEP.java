@@ -11,8 +11,12 @@ import javax.xml.bind.DatatypeConverter;
 public class OAEP {
 
 	private MessageDigest digest;
+	private int k;
 
 	public OAEP() {
+
+		k = 128;
+
 		digest = null;
 
 		try {
@@ -24,7 +28,7 @@ public class OAEP {
 
 	}
 
-	public void OAEP_encode(String M) {
+	public void OAEP_encode(String M, String seedString) {
 
 		byte[] Mbytes = toByteArray(M);
 
@@ -34,23 +38,17 @@ public class OAEP {
 
 		byte[] lHash = digest.digest();
 
-		byte[] PS = new byte[128 - Mbytes.length - 2 * digest.getDigestLength() - 2];
+		byte[] PS = new byte[k - Mbytes.length - 2 * digest.getDigestLength() - 2];
 
-		byte[] pshash = concatenate(lHash, PS);
+		byte[] temp = concatenate(concatenate(lHash, PS), concatenate(new byte[] { 0x01 }, Mbytes));
 
-		byte[] zeroOneMessage = concatenate(new byte[] { 0x01 }, Mbytes);
-
-		byte[] temp = concatenate(pshash, zeroOneMessage);
-
-		byte[] DB = new byte[128 - digest.getDigestLength() - 1];
+		byte[] DB = new byte[k - digest.getDigestLength() - 1];
 
 		System.arraycopy(temp, 0, DB, 0, temp.length);
 
-		String seedString = "1e652ec152d0bfcd65190ffc604c0933d0423381";
-
 		byte[] seed = toByteArray(seedString);
 
-		byte[] dbMask = MGF(seed, (128 - digest.getDigestLength() - 1));
+		byte[] dbMask = MGF(seed, (k - digest.getDigestLength() - 1));
 
 		byte[] maskedDB = xor(DB, dbMask);
 
@@ -58,15 +56,61 @@ public class OAEP {
 
 		byte[] maskedSeed = xor(seed, seedMask);
 
-		byte[] almost = concatenate(new byte[] { 0x00 }, maskedSeed);
+		byte[] EM = concatenate(concatenate(new byte[] { 0x00 }, maskedSeed), maskedDB);
 
-		byte[] EM = concatenate(almost, maskedDB);
-
-		System.out.println(toHex(EM));
+		System.out.println("Encoded string: " + toHex(EM));
+		System.out.println("maskedSeed: " + toHex(maskedSeed));
+		System.out.println("maskedDB: " + toHex(maskedDB));
+		System.out.println("-----");
 
 	}
 
-	public void OAEP_decode(byte[] EM) {
+	public void OAEP_decode(String emString) {
+
+		byte[] EM = toByteArray(emString);
+
+		String L = "";
+
+		digest.update(toByteArray(L));
+
+		byte[] lHash = digest.digest();
+
+		byte[] maskedSeed = new byte[digest.getDigestLength()];
+
+		byte[] maskedDB = new byte[k - digest.getDigestLength() - 1];
+
+		System.arraycopy(EM, 1, maskedSeed, 0, maskedSeed.length);
+		System.arraycopy(EM, maskedSeed.length + 1, maskedDB, 0, maskedDB.length);
+
+		byte[] seedMask = MGF(maskedDB, digest.getDigestLength());
+		byte[] seed = xor(maskedSeed, seedMask);
+
+		byte[] dbMask = MGF(seed, k - digest.getDigestLength() - 1);
+
+		byte[] DB = xor(maskedDB, dbMask);
+
+		Byte b = new Byte((byte) 0x01);
+
+		byte[] M = null;
+
+		for (int i = 0; i < DB.length; i++) {
+
+			Byte a = DB[i];
+
+			if (a.compareTo(b) == 0) {
+
+				M = new byte[DB.length - i];
+
+				System.arraycopy(DB, i +1, M, 0, M.length -1);
+				// System.arraycopy(src, srcPos, dest, destPos, length);
+
+			}
+
+		}
+
+		System.out.println("Decoded string: " + toHex(M));
+		System.out.println("maskedSeed: " + toHex(maskedSeed));
+		System.out.println("maskedDB: " + toHex(maskedDB));
 
 	}
 
