@@ -93,16 +93,15 @@ public class OAEP {
 
 		byte[] M = null;
 
-		for (int i = 0; i < DB.length; i++) {
+		for (int i = lHash.length; i < DB.length; i++) {
 
 			Byte a = DB[i];
 
 			if (a.compareTo(b) == 0) {
 
-				M = new byte[DB.length - i];
+				M = new byte[DB.length - i -1];
 
-				System.arraycopy(DB, i +1, M, 0, M.length -1);
-				// System.arraycopy(src, srcPos, dest, destPos, length);
+				System.arraycopy(DB, i + 1, M, 0, M.length);
 
 			}
 
